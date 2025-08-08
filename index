@@ -1,0 +1,481 @@
+# Create a Safari-optimized, mobile-only build
+html = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no, email=no, address=no">
+  <title>指尖测量尺（移动端·Safari优化）</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --panel:#12151a;
+      --ink:#eaeef5;
+      --muted:#93a0b3;
+      --accent:#4aa3ff;
+      --accent-2:#ff5a7a;
+      --ok:#19c37d;
+      --warn:#ffb020;
+      --shadow: 0 8px 30px rgba(0,0,0,.35);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --safe-top: env(safe-area-inset-top);
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Helvetica,Arial;
+      color:var(--ink);
+      background: radial-gradient(1200px 800px at 70% -10%, #1c2330, #0b0d10 52%);
+      overflow: hidden;
+      -webkit-user-select:none;
+      user-select:none;
+      -webkit-touch-callout:none;
+      touch-action: none; /* 确保 iOS 触摸时不滚动页面 */
+    }
+    /* 只允许移动端：大屏与无触控设备显示拦截页 */
+    #gate{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; text-align:center;
+      padding:24px; color:#cbd5e1; background:#0b0d10;
+    }
+    #gate.show{ display:flex }
+    #gate h1{ font-size:20px; margin:0 0 8px 0; color:#eaeef5 }
+    #gate p{ margin:6px 0; color:#93a0b3 }
+    header{
+      position:fixed; left:8px; right:8px; top:calc(8px + var(--safe-top));
+      display:flex; gap:8px; align-items:center; justify-content:space-between;
+      background:color-mix(in srgb, var(--panel) 88%, transparent);
+      border:1px solid #1f2530;
+      border-radius:14px; padding:10px 12px;
+      box-shadow:var(--shadow);
+      z-index:20;
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+    header .title{font-weight:700; letter-spacing:.2px; font-size:15px}
+    header .right{display:flex; gap:8px; align-items:center}
+    .chip{
+      border:1px solid #1f2530; background: #0e1217; color:var(--muted);
+      border-radius:12px; padding:6px 10px; font-size:12px;
+    }
+    button{
+      appearance:none; border:1px solid #1f2530; background:#10141a; color:var(--ink);
+      padding:8px 12px; border-radius:10px; font-weight:600;
+      box-shadow:var(--shadow); font-size:13px;
+    }
+    button.primary{ background:linear-gradient(180deg, #2a76ff, #195bdb); border-color:#1b4da8 }
+    button.ghost{ background:#0e1217 }
+    #hint{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      text-align:center; color:var(--muted);
+      max-width:90vw; line-height:1.6; z-index:0; padding:0 8px;
+    }
+    #hint h1{font-size:22px; margin:0 0 8px 0; color:var(--ink)}
+    #hint p{margin:0; font-size:14px}
+    #badge{
+      position:fixed; left:50%; bottom:calc(16px + var(--safe-bottom)); transform:translateX(-50%) translateY(120%);
+      background:#0f1420; border:1px solid #1f2530; padding:10px 14px;
+      border-radius:12px; font-weight:600; box-shadow:var(--shadow);
+      z-index:15; opacity:.95; transition: transform .18s ease-out;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    #badge.show{ transform:translateX(-50%) translateY(0) }
+    #ruler{
+      position:fixed;
+      width:260px; height:72px;
+      pointer-events:none; z-index:10;
+      background: color-mix(in srgb, #0b111a 84%, transparent);
+      border:1px solid #1f2530; border-radius:12px;
+      box-shadow:var(--shadow);
+      display:flex; align-items:center; justify-content:center;
+    }
+    #ruler.hidden{ display:none }
+    canvas{ width:240px; height:56px; image-rendering: pixelated; }
+    dialog{
+      border:none; padding:0; border-radius:16px; width:min(92vw, 480px);
+      color:var(--ink); background:#0e141d; border:1px solid #1e2633; box-shadow:var(--shadow);
+    }
+    dialog::backdrop{ background:rgba(3,5,8,.55); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px) }
+    .dlg-head{ padding:14px 16px; font-weight:700; border-bottom:1px solid #1e2633 }
+    .dlg-body{ padding:16px; display:grid; gap:14px }
+    .row{ display:grid; gap:8px; font-size:13px; color:var(--muted) }
+    .row strong{ color:var(--ink) }
+    .ctrl{ display:flex; gap:8px; align-items:center }
+    input[type="range"]{ width:100% }
+    .preview-card{
+      width: 220px; height: 138.9px;
+      border:2px dashed var(--accent); border-radius:10px; margin:8px auto; position:relative;
+      display:flex; align-items:center; justify-content:center; color:var(--accent)
+    }
+    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px }
+    footer.tools{
+      position:fixed; right:8px; bottom:calc(8px + var(--safe-bottom)); z-index:20; display:flex; gap:8px;
+    }
+    .pill{
+      font-size:12px; color:#c9d3e1; border:1px solid #1f2530; padding:6px 10px; border-radius:1000px;
+      background:#0e1217;
+    }
+    .note{ font-size:12px; color:var(--muted) }
+    /* Add-to-Home tip */
+    #a2hs{
+      position:fixed; left:50%; bottom:calc(64px + var(--safe-bottom)); transform:translateX(-50%);
+      background:#101827; color:#d1d5db; border:1px solid #1f2530; border-radius:12px; padding:10px 12px; font-size:13px;
+      box-shadow:var(--shadow); display:none; z-index:12;
+    }
+    #a2hs.show{ display:block }
+  </style>
+</head>
+<body>
+  <div id="gate">
+    <div>
+      <h1>仅支持手机端</h1>
+      <p>请用 iPhone/Android 手机的浏览器打开（已针对 iOS Safari 优化）。</p>
+      <p class="note">如确需在桌面调试，可使用手机模拟器并开启触摸事件。</p>
+    </div>
+  </div>
+  <header>
+    <div class="title">指尖测量尺 · mm（移动版）</div>
+    <div class="right">
+      <div class="chip" id="scaleInfo">校准系数 ×1.00</div>
+      <button id="btnCalibrate" class="ghost">校准</button>
+      <button id="btnRules" class="primary">尺码规则</button>
+    </div>
+  </header>
+
+  <div id="hint">
+    <h1>将手指轻压在屏幕上</h1>
+    <p>指尖上方会出现虚拟刻度尺，实时显示接触宽度（精确到 0.1 mm）与推荐尺码。</p>
+    <p class="note">为准确起见，先点右上角「校准」，用一张银行卡对齐虚线框（85.60 mm）。</p>
+  </div>
+
+  <div id="ruler" class="hidden"><canvas id="cv" width="240" height="56"></canvas></div>
+  <div id="badge">— mm • —</div>
+  <div id="a2hs">提示：在 Safari 中点“分享”→“添加到主屏幕”，全屏使用更稳定。</div>
+
+  <footer class="tools">
+    <div class="pill" id="dbg">—</div>
+  </footer>
+
+  <!-- 尺码规则对话框 -->
+  <dialog id="dlgRules">
+    <div class="dlg-head">尺码规则（可修改）</div>
+    <form method="dialog" class="dlg-body">
+      <div class="row">
+        <div>当前规则：&nbsp;<strong>&lt; S 上限 &lt; M 上限 ≤ L</strong></div>
+        <div class="grid">
+          <label> S 上限（mm）<br/><input id="sUpper" type="number" step="0.1" min="5" max="50"></label>
+          <label> M 上限（mm）<br/><input id="mUpper" type="number" step="0.1" min="5" max="50"></label>
+        </div>
+        <div class="note">默认：S &lt; 11，11–13 为 M，&gt; 13 为 L</div>
+      </div>
+      <div class="ctrl">
+        <button value="cancel">取消</button>
+        <button value="ok" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 校准对话框 -->
+  <dialog id="dlgCal">
+    <div class="dlg-head">毫米校准</div>
+    <form method="dialog" class="dlg-body">
+      <div class="row">
+        <div>请把一张 <strong>标准银行卡/信用卡（宽 85.60 mm）</strong> 贴在屏幕上，对齐下方虚线框的宽度。</div>
+        <div class="preview-card" id="cardBox">
+          <div>对齐卡片宽度</div>
+        </div>
+        <div class="ctrl">
+          <input id="scaleRange" type="range" min="0.80" max="1.20" step="0.001">
+          <span id="scaleLabel">×1.00</span>
+        </div>
+        <div class="note">默认用 CSS 英寸换算；校准用于修正设备精度/玻璃曲率/系统缩放等误差。</div>
+      </div>
+      <div class="ctrl">
+        <button value="reset">恢复默认</button>
+        <button value="cancel">取消</button>
+        <button value="ok" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+<script>
+(() => {
+  const $ = sel => document.querySelector(sel);
+  const cv = $('#cv');
+  const ctx = cv.getContext('2d', { alpha: true, desynchronized: true }); // desync 提升 Safari 流畅度
+  const badge = $('#badge');
+  const ruler = $('#ruler');
+  const dbg = $('#dbg');
+  const scaleInfo = $('#scaleInfo');
+  const gate = $('#gate');
+  const a2hs = $('#a2hs');
+
+  // --- 设备与环境判定：仅允许移动端触控 ---
+  const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const isStandalone = window.navigator.standalone === true; // iOS PWA
+  if(!isMobileUA || !hasTouch){
+    gate.classList.add('show');
+  } else {
+    // 在 iOS Safari 显示 A2HS 提示（避免频繁弹出，3天一次）
+    const lastTip = parseInt(localStorage.getItem('a2hs_tip')||'0',10);
+    const now = Date.now();
+    if(!isStandalone && /Safari/i.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent)){
+      if(now - lastTip > 3*24*3600*1000){
+        a2hs.classList.add('show');
+        setTimeout(()=>{ a2hs.classList.remove('show'); localStorage.setItem('a2hs_tip', String(Date.now())); }, 5000);
+      }
+    }
+  }
+
+  // --- 持久化设置 ---
+  const st = {
+    scale: parseFloat(localStorage.getItem('mm_scale') || '1'),
+    sUpper: parseFloat(localStorage.getItem('s_upper') || '11'),
+    mUpper: parseFloat(localStorage.getItem('m_upper') || '13'),
+  };
+
+  // --- CSS 英寸换算为 mm ---
+  function cssPxPerInch(){
+    const tmp = document.createElement('div');
+    tmp.style.width = '1in';
+    tmp.style.position='absolute'; tmp.style.left='-9999px'; tmp.style.top='-9999px';
+    document.body.appendChild(tmp);
+    const v = tmp.getBoundingClientRect().width;
+    tmp.remove();
+    return v;
+  }
+  let pxPerInch = cssPxPerInch();
+  let pxPerMMBase = pxPerInch / 25.4;
+  function pxPerMM(){ return pxPerMMBase * st.scale; }
+  function mmFromPx(px){ return px / pxPerMM(); }
+  function pxFromMM(mm){ return mm * pxPerMM(); }
+
+  function setScaleLabel(){
+    scaleInfo.textContent = `校准系数 ×${st.scale.toFixed(2)}`;
+  }
+  setScaleLabel();
+
+  // --- 尺子绘制（优化 Safari 重绘） ---
+  function drawRuler(currentMM){
+    const w = cv.width, h = cv.height;
+    ctx.clearRect(0,0,w,h);
+
+    ctx.fillStyle = '#0e141d';
+    ctx.fillRect(0,0,w,h);
+
+    const originX = 10;
+    const usableW = w - originX - 10;
+
+    const ppm = pxPerMM();
+    const totalMM = Math.floor(usableW/ppm);
+    ctx.strokeStyle = '#2d3b51';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let i=0;i<=totalMM;i++){
+      const x = originX + i*ppm + 0.5;
+      const len = (i%10===0) ? 18 : (i%5===0 ? 12 : 7);
+      ctx.moveTo(x, 6); ctx.lineTo(x, 6+len);
+    }
+    ctx.stroke();
+
+    // 10mm 标签
+    ctx.fillStyle = '#c9d3e1';
+    ctx.font = '11px -apple-system, system-ui, Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for(let i=0;i<=totalMM;i+=10){
+      const x = originX + i*ppm;
+      ctx.fillText(i.toString(), x, 26);
+    }
+
+    // 当前宽度
+    const px = Math.max(0, Math.min(usableW, pxFromMM(currentMM)));
+    ctx.strokeStyle = '#4aa3ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(originX, 46);
+    ctx.lineTo(originX + px, 46);
+    ctx.stroke();
+
+    // 端点
+    ctx.strokeStyle = '#ff5a7a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(originX, 38); ctx.lineTo(originX, 54);
+    ctx.moveTo(originX + px, 38); ctx.lineTo(originX + px, 54);
+    ctx.stroke();
+  }
+
+  function sizeFromMM(mm){
+    if(mm < st.sUpper) return 'S';
+    if(mm <= st.mUpper) return 'M';
+    return 'L';
+  }
+
+  // --- 读取 Safari 触点几何：优先 PointerEvent.width，其次 Touch.radiusX ---
+  let measuring = false;
+  let pendingFrame = false;
+  let lastX=0, lastY=0, lastWidthPx=0;
+
+  function placeAndRender(){
+    pendingFrame = false;
+    const mm = mmFromPx(lastWidthPx);
+
+    // 放置尺子于手指上方
+    const rw = ruler.getBoundingClientRect().width;
+    const rh = ruler.getBoundingClientRect().height;
+    let left = Math.min(Math.max(8, lastX - rw/2), window.innerWidth - rw - 8);
+    let top = Math.max(8 + parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')||0), lastY - rh - 22);
+    ruler.style.left = left + 'px';
+    ruler.style.top = top + 'px';
+    ruler.classList.remove('hidden');
+
+    drawRuler(mm);
+
+    const size = sizeFromMM(mm);
+    badge.textContent = `${mm.toFixed(1)} mm • 尺码 ${size}`;
+    badge.classList.add('show');
+
+    dbg.textContent = `w:${lastWidthPx.toFixed(1)}px → ${mm.toFixed(2)}mm | px/mm:${pxPerMM().toFixed(3)}`;
+  }
+
+  function scheduleRender(){
+    if(!pendingFrame){
+      pendingFrame = true;
+      requestAnimationFrame(placeAndRender);
+    }
+  }
+
+  // Pointer Events（iOS 13+ Safari 支持，width 单位为 CSS px）
+  function onPointerDown(e){
+    if(e.pointerType !== 'touch') return;
+    measuring = true;
+    if(e.width && e.width > 0){
+      lastX = e.clientX; lastY = e.clientY; lastWidthPx = e.width;
+      scheduleRender();
+    }
+  }
+  function onPointerMove(e){
+    if(!measuring || e.pointerType !== 'touch') return;
+    if(e.width && e.width > 0){
+      lastX = e.clientX; lastY = e.clientY; lastWidthPx = e.width;
+      scheduleRender();
+    }
+  }
+  function onPointerUp(e){
+    if(e.pointerType !== 'touch') return;
+    measuring = false;
+  }
+
+  // Touch Events 兜底（Safari radiusX/radiusY 均为 CSS px）
+  function onTouchStart(e){
+    measuring = true;
+    if(e.touches.length > 0){
+      const t = e.touches[0];
+      const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
+      if(widthPx > 0){
+        lastX = t.clientX; lastY = t.clientY; lastWidthPx = widthPx;
+        scheduleRender();
+      }
+    }
+    // 防止页面滚动
+    e.preventDefault();
+  }
+  function onTouchMove(e){
+    if(!measuring) return;
+    if(e.touches.length > 0){
+      const t = e.touches[0];
+      const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
+      if(widthPx > 0){
+        lastX = t.clientX; lastY = t.clientY; lastWidthPx = widthPx;
+        scheduleRender();
+      }
+    }
+    e.preventDefault();
+  }
+  function onTouchEnd(){ measuring = false; }
+
+  // 仅在移动端绑定事件
+  if(!gate.classList.contains('show')){
+    window.addEventListener('pointerdown', onPointerDown, {passive:true});
+    window.addEventListener('pointermove', onPointerMove, {passive:true});
+    window.addEventListener('pointerup', onPointerUp, {passive:true});
+    // Safari 兜底
+    window.addEventListener('touchstart', onTouchStart, {passive:false});
+    window.addEventListener('touchmove', onTouchMove, {passive:false});
+    window.addEventListener('touchend', onTouchEnd, {passive:true});
+    window.addEventListener('touchcancel', onTouchEnd, {passive:true});
+  }
+
+  // --- 对话框与校准 ---
+  const dlgRules = $('#dlgRules');
+  const dlgCal = $('#dlgCal');
+  $('#btnRules').addEventListener('click', () => {
+    $('#sUpper').value = st.sUpper;
+    $('#mUpper').value = st.mUpper;
+    dlgRules.showModal();
+  });
+  dlgRules.addEventListener('close', () => {
+    if(dlgRules.returnValue === 'ok'){
+      const s = parseFloat($('#sUpper').value || '11');
+      const m = parseFloat($('#mUpper').value || '13');
+      st.sUpper = s; st.mUpper = m;
+      localStorage.setItem('s_upper', s.toString());
+      localStorage.setItem('m_upper', m.toString());
+    }
+  });
+
+  $('#btnCalibrate').addEventListener('click', () => {
+    $('#scaleRange').value = st.scale.toString();
+    $('#scaleLabel').textContent = `×${(+st.scale).toFixed(2)}`;
+    const cssPx = pxFromMM(85.6);
+    const cardBox = $('#cardBox');
+    cardBox.style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
+    dlgCal.showModal();
+  });
+  $('#scaleRange').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    $('#scaleLabel').textContent = `×${v.toFixed(2)}`;
+    const cardBox = $('#cardBox');
+    const tmpPxPerMM = pxPerMMBase * v;
+    const cssPx = 85.6 * tmpPxPerMM;
+    cardBox.style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
+  });
+  dlgCal.addEventListener('close', () => {
+    if(dlgCal.returnValue === 'ok'){
+      const v = parseFloat($('#scaleRange').value);
+      st.scale = v;
+      localStorage.setItem('mm_scale', v.toString());
+      setScaleLabel();
+    }else if(dlgCal.returnValue === 'reset'){
+      st.scale = 1;
+      localStorage.removeItem('mm_scale');
+      setScaleLabel();
+    }
+  });
+
+  // --- 适配与稳定性 ---
+  document.addEventListener('gesturestart', e => e.preventDefault()); // iOS 阻止双指缩放
+  window.addEventListener('orientationchange', () => {
+    // 方向变化后重测 CSS inch
+    setTimeout(() => {
+      pxPerInch = cssPxPerInch();
+      pxPerMMBase = pxPerInch / 25.4;
+    }, 250);
+  }, { passive:true });
+
+  // 初始画面
+  drawRuler(0);
+})();
+</script>
+</body>
+</html>
+"""
+path = "/mnt/data/finger-ruler-mobile-safari.html"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(html)
+
+path
