@@ -256,7 +256,7 @@ html = r"""<!doctype html>
   };
 
   function updateScaleChip(){
-    scaleInfo.textContent = 校准×${st.scale.toFixed(2)}｜指甲比例×${st.ratio.toFixed(2)};
+    scaleInfo.textContent = `校准×${st.scale.toFixed(2)}｜指甲比例×${st.ratio.toFixed(2)}`;
   }
   updateScaleChip();
 
@@ -366,9 +366,9 @@ html = r"""<!doctype html>
     const fingerMM = mmFromPx(contactWidthPx);
     const nailMM = fingerMM * st.ratio;
     drawRuler(nailMM);
-    badge.textContent = 估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(nailMM)};
+    badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(nailMM)}`;
     badge.classList.add('show');
-    dbg.textContent = 触点:${contactWidthPx.toFixed(1)}px → 手指:${fingerMM.toFixed(2)}mm → 指甲:${nailMM.toFixed(2)}mm (比例×${st.ratio.toFixed(2)}) | px/mm:${pxPerMM().toFixed(3)};
+    dbg.textContent = `触点:${contactWidthPx.toFixed(1)}px → 手指:${fingerMM.toFixed(2)}mm → 指甲:${nailMM.toFixed(2)}mm (比例×${st.ratio.toFixed(2)}) | px/mm:${pxPerMM().toFixed(3)}`;
   }
 
   // Pointer + Touch 事件
@@ -406,17 +406,17 @@ html = r"""<!doctype html>
   const dlgCal = $('#dlgCal');
   $('#btnCalibrate').addEventListener('click', () => {
     $('#scaleRange').value = st.scale.toString();
-    $('#scaleLabel').textContent = ×${(+st.scale).toFixed(2)};
+    $('#scaleLabel').textContent = `×${(+st.scale).toFixed(2)}`;
     const cssPx = 85.6 * (pxPerMMBase * st.scale);
-    $('#cardBox').style.width = ${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px;
+    $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
     dlgCal.showModal();
   });
   $('#scaleRange').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
-    $('#scaleLabel').textContent = ×${v.toFixed(2)};
+    $('#scaleLabel').textContent = `×${v.toFixed(2)}`;
     const tmpPxPerMM = pxPerMMBase * v;
     const cssPx = 85.6 * tmpPxPerMM;
-    $('#cardBox').style.width = ${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px;
+    $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
   });
   dlgCal.addEventListener('close', () => {
     if(dlgCal.returnValue === 'ok'){
@@ -434,12 +434,12 @@ html = r"""<!doctype html>
   const dlgRatio = $('#dlgRatio');
   $('#btnRatio').addEventListener('click', () => {
     $('#ratioRange').value = st.ratio.toString();
-    $('#ratioLabel').textContent = ×${st.ratio.toFixed(2)};
+    $('#ratioLabel').textContent = `×${st.ratio.toFixed(2)}`;
     dlgRatio.showModal();
   });
   $('#ratioRange').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
-    $('#ratioLabel').textContent = ×${v.toFixed(2)};
+    $('#ratioLabel').textContent = `×${v.toFixed(2)}`;
   });
   dlgRatio.addEventListener('close', () => {
     if(dlgRatio.returnValue === 'ok'){
