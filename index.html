@@ -375,8 +375,11 @@
     document.addEventListener('touchend', () => { measuring = false; }, { passive:true });
     document.addEventListener('touchcancel', () => { measuring = false; }, { passive:true });
 
-    // 模式切换与锁定
-    })
+    // 模式切换（仅手动/触点切换）
+    btnMode.addEventListener('click', () => {
+      manualMode = !manualMode;
+      updateModeUI();
+    });
     function updateModeUI(){
       modeText.textContent = manualMode ? '手动' : '触点';
       manualWrap.style.display = manualMode ? 'block' : 'none';
@@ -515,6 +518,7 @@
         drawRuler(nailMM);
       }
 
+      updateModeUI();
       requestAnimationFrame(tick);
     }
 
