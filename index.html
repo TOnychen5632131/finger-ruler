@@ -1,4 +1,4 @@
-# Fix the JS bug (double dot) and generate a corrected build
+# Build a real-time update + center-0 aligned S-band fix
 html = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -7,7 +7,7 @@ html = r"""<!doctype html>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no, email=no, address=no">
-  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度·修复版）</title>
+  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度·实时修复）</title>
   <style>
     :root{
       --bg:#0b0d10;
@@ -77,7 +77,7 @@ html = r"""<!doctype html>
     }
     #badge.show{ transform:translateX(-50%) translateY(0) }
     #ruler{
-      position:fixed; width:310px; height:108px;
+      position:fixed; width:310px; height:116px;
       pointer-events:none; z-index:20;
       background: color-mix(in srgb, #0b111a 84%, transparent);
       border:1px solid #1f2530; border-radius:12px;
@@ -85,7 +85,7 @@ html = r"""<!doctype html>
       display:flex; align-items:center; justify-content:center;
     }
     #ruler.hidden{ display:none }
-    canvas{ width:286px; height:78px; image-rendering: pixelated; }
+    canvas{ width:292px; height:86px; image-rendering: pixelated; }
     dialog{
       border:none; padding:0; border-radius:16px; width:min(92vw, 480px);
       color:var(--ink); background:#0e141d; border:1px solid #1e2633; box-shadow:var(--shadow);
@@ -121,10 +121,10 @@ html = r"""<!doctype html>
     <h1>将指尖轻压在屏幕上</h1>
     <p>读取接触宽度，按照 <b>指甲 = 手指 × 比例</b> 估算（比例默认 0.68，可调）。</p>
     <p>尺子采用<b>中心零刻度</b>与 <b>L | M | S | M | L</b> 视觉布局：S 区域居中，零点在 S 正上方，两侧以 5、10、15… 递增。</p>
-    <p class="note">默认<b>校准</b>为 <b>0.83</b>（你反馈的更准值），不同设备仍可手动微调。</p>
+    <p class="note">默认<b>校准</b>为 <b>0.83</b>（你反馈更准），不同设备仍可手动微调。</p>
   </div>
 
-  <div id="ruler" class="hidden"><canvas id="cv" width="286" height="78"></canvas></div>
+  <div id="ruler" class="hidden"><canvas id="cv" width="292" height="86"></canvas></div>
   <div id="badge">— mm • —</div>
 
   <!-- 尺码规则 -->
@@ -192,6 +192,7 @@ html = r"""<!doctype html>
   const ruler = $('#ruler');
   const scaleInfo = $('#scaleInfo');
 
+  // 仅移动端
   const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   if(!isMobileUA || !hasTouch){ $('#gate').classList.add('show'); }
@@ -222,6 +223,7 @@ html = r"""<!doctype html>
   function mmFromPx(px){ return px / pxPerMM(); }
   function pxFromMM(mm){ return mm * pxPerMM(); }
 
+  // 画尺子：S 带中心 = 零刻度
   function drawRuler(nailMM){
     const w = cv.width, h = cv.height;
     ctx.clearRect(0,0,w,h);
@@ -232,74 +234,70 @@ html = r"""<!doctype html>
     const usableW = w - originX - 10;
     const ppm = pxPerMM();
 
+    // 分界与中心（单位：mm）
     const sM = (st.sTarget + st.mTarget) / 2; // 15.5
     const mL = (st.mTarget + st.lTarget) / 2; // 16.5
     const centerMM = (sM + mL) / 2;           // 16.0
     const centerX = originX + centerMM * ppm;
 
-    const bandTop = 26, bandH = 24;
+    // 带区域：左(M/L)，中(S)，右(M/L)
+    const bandTop = 30, bandH = 26;
     function xOf(mm){ return originX + Math.max(0, Math.min(usableW, mm * ppm)); }
     ctx.fillStyle = '#23161d'; ctx.fillRect(originX, bandTop, xOf(sM)-originX, bandH);
     ctx.fillStyle = '#13261c'; ctx.fillRect(xOf(sM), bandTop, xOf(mL)-xOf(sM), bandH);
     ctx.fillStyle = '#23161d'; ctx.fillRect(xOf(mL), bandTop, originX+usableW-xOf(mL), bandH);
 
+    // 分隔线
     ctx.strokeStyle = '#3a475b'; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(xOf(sM)+0.5, bandTop-10); ctx.lineTo(xOf(sM)+0.5, bandTop+bandH+10);
-    ctx.moveTo(xOf(mL)+0.5, bandTop-10); ctx.lineTo(xOf(mL)+0.5, bandTop+bandH+10);
+    ctx.moveTo(xOf(sM)+0.5, bandTop-12); ctx.lineTo(xOf(sM)+0.5, bandTop+bandH+12);
+    ctx.moveTo(xOf(mL)+0.5, bandTop-12); ctx.lineTo(xOf(mL)+0.5, bandTop+bandH+12);
     ctx.stroke();
 
+    // 标签位置与实际边界对齐：S 放在 sM~mL 中心；左右 M/L 按区间中点放置
     ctx.font = 'bold 12px -apple-system, system-ui, Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const leftEdge = originX, rightEdge = originX + usableW;
-    const secW = (rightEdge - leftEdge) / 5;
-    const centers = [
-      leftEdge + secW*0.5,
-      leftEdge + secW*1.5,
-      leftEdge + secW*2.5,
-      leftEdge + secW*3.5,
-      leftEdge + secW*4.5,
-    ];
-    ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', centers[0], bandTop+bandH/2);
-    ctx.fillStyle = '#e8d089'; ctx.fillText('M', centers[1], bandTop+bandH/2);
-    ctx.fillStyle = '#8fe3be'; ctx.fillText('S', centers[2], bandTop+bandH/2);
-    ctx.fillStyle = '#e8d089'; ctx.fillText('M', centers[3], bandTop+bandH/2);
-    ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', centers[4], bandTop+bandH/2);
+    ctx.fillStyle = '#8fe3be'; ctx.fillText('S', (xOf(sM)+xOf(mL))/2, bandTop+bandH/2);
+    ctx.fillStyle = '#e8d089'; ctx.fillText('M', (originX+xOf(sM))/2, bandTop+bandH/2);
+    ctx.fillStyle = '#e8d089'; ctx.fillText('M', (xOf(mL)+originX+usableW)/2, bandTop+bandH/2);
+    ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', originX+12, bandTop+bandH/2);
+    ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', originX+usableW-12, bandTop+bandH/2);
 
-    // center-zero ticks
+    // 顶部：中心零刻度 + 对称 5mm 递增（数字与刻度）
+    const leftEdge = originX, rightEdge = originX + usableW;
     ctx.strokeStyle = '#2d3b51'; ctx.lineWidth = 1;
-    const stepPx = pxFromMM(5); 
-    const maxSteps = Math.ceil((Math.max(centerX-originX, rightEdge-centerX)) / stepPx) + 1;
+    const stepPx = pxFromMM(5);
+    const maxSteps = Math.ceil((Math.max(centerX-leftEdge, rightEdge-centerX)) / stepPx) + 1;
     ctx.beginPath();
     for(let i=-maxSteps; i<=maxSteps; i++){
       const x = centerX + i*stepPx + 0.5;
-      if(x < originX || x > originX+usableW) continue;
-      const len = (i%2===0) ? 10 : 6;
-      ctx.moveTo(x, bandTop-2); ctx.lineTo(x, bandTop-2-len);
+      if(x < leftEdge || x > rightEdge) continue;
+      const len = (i%2===0) ? 10 : 6; // 每10mm更长
+      ctx.moveTo(x, bandTop-4); ctx.lineTo(x, bandTop-4-len);
     }
     ctx.stroke();
     ctx.fillStyle = '#c9d3e1';
     ctx.font = '10px -apple-system, system-ui, Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText('0', centerX, bandTop-4);
+    ctx.fillText('0', centerX, bandTop-6);
     for(let mm=5; mm<=50; mm+=5){
       const xR = centerX + pxFromMM(mm);
       const xL = centerX - pxFromMM(mm);
-      if(xR>=originX && xR<=originX+usableW) ctx.fillText(String(mm), xR, bandTop-4);
-      if(xL>=originX && xL<=originX+usableW) ctx.fillText(String(mm), xL, bandTop-4);
+      if(xR>=leftEdge && xR<=rightEdge) ctx.fillText(String(mm), xR, bandTop-6);
+      if(xL>=leftEdge && xL<=rightEdge) ctx.fillText(String(mm), xL, bandTop-6);
     }
 
-    // current value indicator
+    // 当前值指示（从 0mm 开始到 nailMM 的绝对长度）
     const px = Math.max(0, Math.min(usableW, pxFromMM(nailMM)));
     ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(originX, bandTop+bandH+12);
-    ctx.lineTo(originX + px, bandTop+bandH+12);
+    ctx.moveTo(originX, bandTop+bandH+14);
+    ctx.lineTo(originX + px, bandTop+bandH+14);
     ctx.stroke();
     ctx.strokeStyle = '#ff5a7a';
     ctx.beginPath();
-    ctx.moveTo(originX, bandTop+bandH+4); ctx.lineTo(originX, bandTop+bandH+20);
-    ctx.moveTo(originX + px, bandTop+bandH+4); ctx.lineTo(originX + px, bandTop+bandH+20);
+    ctx.moveTo(originX, bandTop+bandH+6); ctx.lineTo(originX, bandTop+bandH+22);
+    ctx.moveTo(originX + px, bandTop+bandH+6); ctx.lineTo(originX + px, bandTop+bandH+22);
     ctx.stroke();
   }
 
@@ -321,19 +319,36 @@ html = r"""<!doctype html>
     ruler.classList.remove('hidden');
   }
 
-  let measuring = false;
-  function updateFromContact(x, y, contactWidthPx){
-    placeRuler(x, y);
-    const fingerMM = mmFromPx(contactWidthPx);
-    const nailMM = fingerMM * st.ratio;
-    drawRuler(nailMM);
-    const size = sizeFromNailWidth(nailMM);
-    badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${size}`;
-    badge.classList.add('show');
+  // —— 实时更新（rAF + 事件喂数） ——
+  let measuring = false, hasSample=false;
+  let lastX=0, lastY=0, lastW=0;
+  function feedSample(x,y,w){
+    lastX=x; lastY=y; lastW=w; hasSample=true;
+    placeRuler(x,y);
   }
+  function loop(){
+    if(measuring && hasSample){
+      const fingerMM = mmFromPx(lastW);
+      const nailMM = fingerMM * st.ratio;
+      drawRuler(nailMM);
+      badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(nailMM)}`;
+      badge.classList.add('show');
+      hasSample=false; // 等待下一帧新样本
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 
-  function onPointerDown(e){ if(e.pointerType==='touch'){ measuring=true; if(e.width>0) updateFromContact(e.clientX, e.clientY, e.width);} }
-  function onPointerMove(e){ if(measuring && e.pointerType==='touch' && e.width>0) updateFromContact(e.clientX, e.clientY, e.width); }
+  // Pointer / Touch 事件：不断喂样本，动画循环实时渲染
+  function onPointerDown(e){
+    if(e.pointerType !== 'touch') return;
+    measuring = true;
+    if(e.width && e.width>0) feedSample(e.clientX, e.clientY, e.width);
+  }
+  function onPointerMove(e){
+    if(!measuring || e.pointerType !== 'touch') return;
+    if(e.width && e.width>0) feedSample(e.clientX, e.clientY, e.width);
+  }
   function onPointerUp(e){ if(e.pointerType==='touch') measuring=false; }
   window.addEventListener('pointerdown', onPointerDown, {passive:true});
   window.addEventListener('pointermove', onPointerMove, {passive:true});
@@ -343,7 +358,7 @@ html = r"""<!doctype html>
     if(e.touches.length===0) return;
     const t = e.touches[0];
     const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
-    if(widthPx>0) updateFromContact(t.clientX, t.clientY, widthPx);
+    if(widthPx>0) feedSample(t.clientX, t.clientY, widthPx);
   }
   window.addEventListener('touchstart', onTouch, {passive:true});
   window.addEventListener('touchmove', onTouch, {passive:true});
@@ -351,7 +366,6 @@ html = r"""<!doctype html>
   // 校准
   const dlgCal = $('#dlgCal');
   $('#btnCalibrate').addEventListener('click', () => {
-    // FIXED: no double dot
     $('#scaleRange').value = st.scale.toString();
     $('#scaleLabel').textContent = `×${st.scale.toFixed(2)}`;
     const tmpPxPerMM = (cssPxPerInch()/25.4) * st.scale;
@@ -385,7 +399,7 @@ html = r"""<!doctype html>
     $('#ratioLabel').textContent = `×${st.ratio.toFixed(2)}`;
     dlgRatio.showModal();
   });
-  $('#ratioRange').addEventListener('input', (e) => {
+  $('#ratioRange'].addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
     $('#ratioLabel').textContent = `×${v.toFixed(2)}`;
   });
@@ -427,7 +441,7 @@ html = r"""<!doctype html>
 </body>
 </html>
 """
-path = "/mnt/data/finger-ruler-nailratio-centered-scale083-fix.html"
+path = "/mnt/data/finger-ruler-nailratio-centered-scale083-rtfix.html"
 with open(path, "w", encoding="utf-8") as f:
     f.write(html)
 
