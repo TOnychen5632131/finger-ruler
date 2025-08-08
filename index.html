@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no, email=no, address=no">
-  <title>指甲宽度测量 · mm（移动端·Safari优化）</title>
+  <title>指甲宽度估算 · mm（移动端·Safari优化）</title>
   <style>
     :root{
       --bg:#0b0d10;
@@ -20,6 +20,8 @@
       --shadow: 0 8px 30px rgba(0,0,0,.35);
       --safe-bottom: env(safe-area-inset-bottom);
       --safe-top: env(safe-area-inset-top);
+      --s:#173c2d; --m:#2b2a1b; --l:#3d1f29; /* zone backgrounds */
+      --sText:#8fe3be; --mText:#e8d089; --lText:#ffb2c1;
     }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html,body{height:100%}
@@ -78,7 +80,7 @@
     }
     #badge.show{ transform:translateX(-50%) translateY(0) }
     #ruler{
-      position:fixed; width:280px; height:92px;
+      position:fixed; width:300px; height:100px;
       pointer-events:none; z-index:20;
       background: color-mix(in srgb, #0b111a 84%, transparent);
       border:1px solid #1f2530; border-radius:12px;
@@ -86,25 +88,7 @@
       display:flex; align-items:center; justify-content:center;
     }
     #ruler.hidden{ display:none }
-    canvas{ width:256px; height:64px; image-rendering: pixelated; }
-    /* nail handles */
-    .handles{ position:absolute; inset:0; pointer-events:none }
-    .handle{
-      position:absolute; top:18px; width:20px; height:28px; border-radius:10px;
-      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
-      display:flex; align-items:center; justify-content:center;
-      pointer-events:auto; touch-action:none;
-    }
-    .handle::after{
-      content:''; width:4px; height:20px; background:#e5e7eb; border-radius:2px;
-      box-shadow:0 0 0 1px rgba(0,0,0,.25) inset;
-    }
-    .tip{
-      position:absolute; left:50%; top:4px; transform:translateX(-50%);
-      font-size:11px; color:#d1d5db; opacity:.9;
-      background:rgba(16,22,33,.65); padding:2px 8px; border-radius:999px; border:1px solid #1f2530;
-      -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
-    }
+    canvas{ width:276px; height:70px; image-rendering: pixelated; }
     dialog{
       border:none; padding:0; border-radius:16px; width:min(92vw, 480px);
       color:var(--ink); background:#0e141d; border:1px solid #1e2633; box-shadow:var(--shadow);
@@ -136,12 +120,6 @@
       box-shadow:var(--shadow); display:none; z-index:12;
     }
     #a2hs.show{ display:block }
-    /* mode toggle */
-    .seg{
-      display:flex; border:1px solid #1f2530; border-radius:10px; overflow:hidden;
-    }
-    .seg button{ border:0; background:#0e1217; color:#cbd5e1; padding:6px 10px; font-weight:600; }
-    .seg button.active{ background:#1b2a3f; color:#eaeef5 }
   </style>
 </head>
 <body>
@@ -149,36 +127,26 @@
     <div>
       <h1>仅支持手机端</h1>
       <p>请用 iPhone/Android 手机的浏览器打开（已针对 iOS Safari 优化）。</p>
-      <p class="note">如需在桌面调试，请开启手机模拟与触摸事件。</p>
     </div>
   </div>
   <header>
-    <div class="title">指甲宽度测量 · mm</div>
+    <div class="title">指甲宽度估算 · mm</div>
     <div class="right">
-      <div class="chip" id="scaleInfo">校准系数 ×1.00</div>
-      <div class="seg">
-        <button id="modeNail" class="active">指甲模式</button>
-        <button id="modeTouch">触点模式</button>
-      </div>
+      <div class="chip" id="scaleInfo">校准×1.00｜指甲比例×0.68</div>
       <button id="btnCalibrate" class="ghost">校准</button>
+      <button id="btnRatio" class="ghost">指甲比例</button>
       <button id="btnRules" class="primary">尺码规则</button>
     </div>
   </header>
 
   <div id="hint">
     <h1>将手指轻压在屏幕上</h1>
-    <p>指尖上方出现尺子。<b>指甲模式</b>下，拖动两侧白色把手，使其<strong>刚好贴齐指甲两侧</strong>，得到精确指甲宽度与推荐尺码。</p>
-    <p class="note">先点右上角「校准」，用银行卡对齐虚线框（85.60 mm）。</p>
+    <p>我们会读取<strong>手指接触宽度</strong>，按“<b>指甲≈手指×比例</b>”估算指甲宽度（默认 0.68）。</p>
+    <p>尺子中部显示 <b>S / M / L</b> 区间带；读数落在哪一段，就推荐对应尺码。</p>
+    <p class="note">建议先用「校准」对齐银行卡 85.60mm；若感觉估得偏大/偏小，可在「指甲比例」微调（常见 0.65–0.75）。</p>
   </div>
 
-  <div id="ruler" class="hidden">
-    <div class="handles">
-      <div class="tip">拖动白把手对齐指甲两侧</div>
-      <div id="hLeft" class="handle" style="left:42px"></div>
-      <div id="hRight" class="handle" style="left:190px"></div>
-    </div>
-    <canvas id="cv" width="256" height="64"></canvas>
-  </div>
+  <div id="ruler" class="hidden"><canvas id="cv" width="276" height="70"></canvas></div>
   <div id="badge">— mm • —</div>
   <div id="a2hs">提示：在 Safari 中点“分享”→“添加到主屏幕”，全屏使用更稳定。</div>
 
@@ -186,18 +154,17 @@
     <div class="pill" id="dbg">—</div>
   </footer>
 
-  <!-- 尺码规则对话框（默认采用你提供的 S/M/L 拇指值 15/16/17 mm） -->
+  <!-- 尺码规则（默认拇指：S≈15，M≈16，L≈17；边界取中点 15.5/16.5） -->
   <dialog id="dlgRules">
-    <div class="dlg-head">尺码规则（默认按拇指指甲宽度）</div>
+    <div class="dlg-head">尺码规则（拇指）</div>
     <form method="dialog" class="dlg-body">
       <div class="row">
-        <div>默认以<b>拇指指甲</b>宽度为准：S≈15mm，M≈16mm，L≈17mm。</div>
+        <div>默认以<b>拇指指甲宽度</b>判定：S≈15mm，M≈16mm，L≈17mm；边界为中点。</div>
         <div class="grid">
           <label>S 目标（mm）<br/><input id="ruleS" type="number" step="0.1" min="10" max="30"></label>
           <label>M 目标（mm）<br/><input id="ruleM" type="number" step="0.1" min="10" max="30"></label>
         </div>
-        <div class="row">边界按两档的中点计算：S/M 分界 = (S+M)/2，M/L 分界 = (M+L)/2。</div>
-        <div class="note">如需完整五指表（S=15/11/12/11/9；M=16/12/13/12/10；L=17/13/14/13/11），可在说明中展示，但推荐尺码仍以拇指宽度为准。</div>
+        <div class="note">M/L 的目标默认 17mm；若要五指各自规则，我可以给你扩展一个“选择手指”的下拉。</div>
       </div>
       <div class="ctrl">
         <button value="cancel">取消</button>
@@ -206,7 +173,7 @@
     </form>
   </dialog>
 
-  <!-- 校准对话框 -->
+  <!-- 校准 -->
   <dialog id="dlgCal">
     <div class="dlg-head">毫米校准</div>
     <form method="dialog" class="dlg-body">
@@ -229,6 +196,25 @@
     </form>
   </dialog>
 
+  <!-- 指甲比例 -->
+  <dialog id="dlgRatio">
+    <div class="dlg-head">指甲占手指比例</div>
+    <form method="dialog" class="dlg-body">
+      <div class="row">
+        <div>估算公式：<strong>指甲宽 ≈ 手指接触宽 × 比例</strong></div>
+        <div class="ctrl">
+          <input id="ratioRange" type="range" min="0.50" max="0.90" step="0.01">
+          <span id="ratioLabel">×0.68</span>
+        </div>
+        <div class="note">常见范围 0.65–0.75。你可以根据用户反馈调整默认值。</div>
+      </div>
+      <div class="ctrl">
+        <button value="cancel">取消</button>
+        <button value="ok" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
 <script>
 (() => {
   const $ = sel => document.querySelector(sel);
@@ -240,12 +226,8 @@
   const scaleInfo = $('#scaleInfo');
   const gate = $('#gate');
   const a2hs = $('#a2hs');
-  const hLeft = $('#hLeft');
-  const hRight = $('#hRight');
-  const handlesBox = ruler.querySelector('.handles');
-  const tipEl = ruler.querySelector('.tip');
 
-  // 环境判定：仅移动触控
+  // 环境：仅移动触控
   const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   const isStandalone = window.navigator.standalone === true;
@@ -262,14 +244,19 @@
     }
   }
 
-  // 设置
+  // 持久化设置
   const st = {
     scale: parseFloat(localStorage.getItem('mm_scale') || '1'),
-    // 默认规则（拇指 15/16/17）
+    ratio: parseFloat(localStorage.getItem('nail_ratio') || '0.68'),
     sTarget: parseFloat(localStorage.getItem('rule_s') || '15'),
     mTarget: parseFloat(localStorage.getItem('rule_m') || '16'),
     lTarget: 17
   };
+
+  function updateScaleChip(){
+    scaleInfo.textContent = `校准×${st.scale.toFixed(2)}｜指甲比例×${st.ratio.toFixed(2)}`;
+  }
+  updateScaleChip();
 
   // 换算
   function cssPxPerInch(){
@@ -286,55 +273,71 @@
   function pxPerMM(){ return pxPerMMBase * st.scale; }
   function mmFromPx(px){ return px / pxPerMM(); }
   function pxFromMM(mm){ return mm * pxPerMM(); }
-  function setScaleLabel(){ scaleInfo.textContent = `校准系数 ×${st.scale.toFixed(2)}`; }
-  setScaleLabel();
 
-  // 尺子绘制
-  function drawRuler(currentMM){
+  // 画带有 S/M/L 区间带的尺子
+  function drawRuler(nailMM){
     const w = cv.width, h = cv.height;
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = '#0e141d';
     ctx.fillRect(0,0,w,h);
+
     const originX = 10;
     const usableW = w - originX - 10;
     const ppm = pxPerMM();
     const totalMM = Math.floor(usableW/ppm);
-    ctx.strokeStyle = '#2d3b51';
-    ctx.lineWidth = 1;
+
+    // 区间边界（按目标中点）
+    const sM = (st.sTarget + st.mTarget) / 2;
+    const mL = (st.mTarget + st.lTarget) / 2;
+
+    // 绘制 S/M/L 背景带
+    const bandTop = 20, bandH = 24;
+    function xOf(mm){ return originX + mm*ppm; }
+    ctx.fillStyle = '#14241c'; ctx.fillRect(originX, bandTop, Math.max(0, Math.min(usableW, xOf(sM) - originX)), bandH);
+    ctx.fillStyle = '#1f1f14'; ctx.fillRect(xOf(sM), bandTop, Math.max(0, Math.min(usableW, xOf(mL)-xOf(sM))), bandH);
+    ctx.fillStyle = '#23161d'; ctx.fillRect(xOf(mL), bandTop, Math.max(0, Math.min(usableW, originX+usableW - xOf(mL))), bandH);
+    // 标签
+    ctx.font = 'bold 12px -apple-system, system-ui, Segoe UI';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#8fe3be'; ctx.fillText('S', (originX + xOf(sM))/2, bandTop+bandH/2);
+    ctx.fillStyle = '#e8d089'; ctx.fillText('M', (xOf(sM) + xOf(mL))/2, bandTop+bandH/2);
+    ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', (xOf(mL) + (originX+usableW))/2, bandTop+bandH/2);
+
+    // 刻度线（上沿）
+    ctx.strokeStyle = '#2d3b51'; ctx.lineWidth = 1;
     ctx.beginPath();
     for(let i=0;i<=totalMM;i++){
       const x = originX + i*ppm + 0.5;
-      const len = (i%10===0) ? 18 : (i%5===0 ? 12 : 7);
-      ctx.moveTo(x, 6); ctx.lineTo(x, 6+len);
+      const len = (i%10===0) ? 10 : (i%5===0 ? 7 : 4);
+      ctx.moveTo(x, bandTop-2); ctx.lineTo(x, bandTop-2-len);
     }
     ctx.stroke();
-    // 标签
+    // 10mm 数字放在顶部，不干扰中间 S/M/L
     ctx.fillStyle = '#c9d3e1';
-    ctx.font = '11px -apple-system, system-ui, Segoe UI';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.font = '10px -apple-system, system-ui, Segoe UI';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     for(let i=0;i<=totalMM;i+=10){
       const x = originX + i*ppm;
-      ctx.fillText(i.toString(), x, 26);
+      ctx.fillText(i.toString(), x, bandTop-4);
     }
-    // 当前宽度线段
-    const px = Math.max(0, Math.min(usableW, pxFromMM(currentMM)));
+
+    // 当前指甲宽度高亮
+    const px = Math.max(0, Math.min(usableW, pxFromMM(nailMM)));
     ctx.strokeStyle = '#4aa3ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(originX, 46);
-    ctx.lineTo(originX + px, 46);
+    ctx.moveTo(originX, bandTop+bandH+10);
+    ctx.lineTo(originX + px, bandTop+bandH+10);
     ctx.stroke();
     // 端点
     ctx.strokeStyle = '#ff5a7a';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(originX, 38); ctx.lineTo(originX, 54);
-    ctx.moveTo(originX + px, 38); ctx.lineTo(originX + px, 54);
+    ctx.moveTo(originX, bandTop+bandH+2); ctx.lineTo(originX, bandTop+bandH+18);
+    ctx.moveTo(originX + px, bandTop+bandH+2); ctx.lineTo(originX + px, bandTop+bandH+18);
     ctx.stroke();
   }
 
-  // 推荐尺码：按目标值 S=15 M=16 L=17，边界取中点（15.5 / 16.5）
   function sizeFromNailWidth(mm){
     const sM = (st.sTarget + st.mTarget) / 2;
     const mL = (st.mTarget + st.lTarget) / 2;
@@ -343,21 +346,7 @@
     return 'L';
   }
 
-  // 模式切换
-  const btnNail = $('#modeNail');
-  const btnTouch = $('#modeTouch');
-  let mode = 'nail'; // 'nail' or 'touch'
-  function setMode(m){
-    mode = m;
-    btnNail.classList.toggle('active', m==='nail');
-    btnTouch.classList.toggle('active', m==='touch');
-    handlesBox.style.display = (m==='nail') ? 'block' : 'none';
-    tipEl.style.display = (m==='nail') ? 'block' : 'none';
-  }
-  btnNail.addEventListener('click', ()=>setMode('nail'));
-  btnTouch.addEventListener('click', ()=>setMode('touch'));
-
-  // 在手指位置弹出尺子
+  // 放置尺子在触点上方
   function placeRuler(x, y){
     const rw = ruler.getBoundingClientRect().width;
     const rh = ruler.getBoundingClientRect().height;
@@ -368,117 +357,97 @@
     ruler.classList.remove('hidden');
   }
 
-  // 触点模式（快速）
+  // 读取接触宽度并估算指甲
   let measuring = false;
-  function updateTouchReading(x, y, widthPx){
+  function updateFromContact(x, y, contactWidthPx){
     placeRuler(x, y);
-    const mm = mmFromPx(widthPx);
-    drawRuler(mm);
-    badge.textContent = `${mm.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(mm)}`;
+    const fingerMM = mmFromPx(contactWidthPx);
+    const nailMM = fingerMM * st.ratio;
+    drawRuler(nailMM);
+    badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(nailMM)}`;
     badge.classList.add('show');
-    dbg.textContent = `触点:${widthPx.toFixed(1)}px → ${mm.toFixed(2)}mm | px/mm:${pxPerMM().toFixed(3)}`;
+    dbg.textContent = `触点:${contactWidthPx.toFixed(1)}px → 手指:${fingerMM.toFixed(2)}mm → 指甲:${nailMM.toFixed(2)}mm (比例×${st.ratio.toFixed(2)}) | px/mm:${pxPerMM().toFixed(3)}`;
   }
+
+  // Pointer + Touch 事件
   function onPointerDown(e){
     if(e.pointerType !== 'touch') return;
     measuring = true;
-    placeRuler(e.clientX, e.clientY);
-    if(mode==='touch' && e.width && e.width>0){
-      updateTouchReading(e.clientX, e.clientY, e.width);
+    if(e.width && e.width>0){
+      updateFromContact(e.clientX, e.clientY, e.width);
     }
   }
   function onPointerMove(e){
     if(!measuring || e.pointerType !== 'touch') return;
-    if(mode==='touch' && e.width && e.width>0){
-      updateTouchReading(e.clientX, e.clientY, e.width);
+    if(e.width && e.width>0){
+      updateFromContact(e.clientX, e.clientY, e.width);
     }
   }
-  function onPointerUp(e){
-    if(e.pointerType !== 'touch') return;
-    measuring = false;
-  }
+  function onPointerUp(e){ if(e.pointerType==='touch') measuring=false; }
+  window.addEventListener('pointerdown', onPointerDown, {passive:true});
+  window.addEventListener('pointermove', onPointerMove, {passive:true});
+  window.addEventListener('pointerup', onPointerUp, {passive:true});
 
-  // 指甲模式：拖动左右把手
-  function updateFromHandles(){
-    // 计算把手中心在 canvas 坐标系的位置，然后转 mm
-    const cvBox = cv.getBoundingClientRect();
-    const lBox = hLeft.getBoundingClientRect();
-    const rBox = hRight.getBoundingClientRect();
-    const lx = (lBox.left + lBox.width/2) - cvBox.left;
-    const rx = (rBox.left + rBox.width/2) - cvBox.left;
-    const originX = 10;
-    const usableW = cv.width - originX - 10;
-    const clamp = v=> Math.max(originX, Math.min(originX+usableW, v));
-    const lxClamped = clamp(lx);
-    const rxClamped = clamp(rx);
-    const px = Math.abs(rxClamped - lxClamped);
-    const mm = mmFromPx(px);
-    drawRuler(mm);
-    badge.textContent = `${mm.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(mm)}`;
-    badge.classList.add('show');
-    dbg.textContent = `把手:${px.toFixed(1)}px → ${mm.toFixed(2)}mm | px/mm:${pxPerMM().toFixed(3)}`;
-  }
-
-  function makeDrag(el){
-    let startX=0, startLeft=0;
-    function onStart(ev){
-      const t = (ev.touches && ev.touches[0]) || ev;
-      startX = t.clientX;
-      startLeft = parseFloat(getComputedStyle(el).left);
-      document.addEventListener('touchmove', onMove, {passive:false});
-      document.addEventListener('touchend', onEnd, {passive:true});
-      document.addEventListener('pointermove', onMove, {passive:false});
-      document.addEventListener('pointerup', onEnd, {passive:true});
-      ev.preventDefault();
-      ev.stopPropagation();
+  function onTouch(e){
+    if(e.touches.length===0) return;
+    const t = e.touches[0];
+    const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
+    if(widthPx>0){
+      updateFromContact(t.clientX, t.clientY, widthPx);
     }
-    function onMove(ev){
-      const t = (ev.touches && ev.touches[0]) || ev;
-      const dx = t.clientX - startX;
-      const box = ruler.getBoundingClientRect();
-      let newLeft = Math.max(8, Math.min(box.width-28, startLeft + dx)); // padding+handle width
-      el.style.left = newLeft + 'px';
-      updateFromHandles();
-      ev.preventDefault();
+  }
+  window.addEventListener('touchstart', onTouch, {passive:true});
+  window.addEventListener('touchmove', onTouch, {passive:true});
+
+  // 对话框们
+  // 校准
+  const dlgCal = $('#dlgCal');
+  $('#btnCalibrate').addEventListener('click', () => {
+    $('#scaleRange').value = st.scale.toString();
+    $('#scaleLabel').textContent = `×${(+st.scale).toFixed(2)}`;
+    const cssPx = 85.6 * (pxPerMMBase * st.scale);
+    $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
+    dlgCal.showModal();
+  });
+  $('#scaleRange').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    $('#scaleLabel').textContent = `×${v.toFixed(2)}`;
+    const tmpPxPerMM = pxPerMMBase * v;
+    const cssPx = 85.6 * tmpPxPerMM;
+    $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
+  });
+  dlgCal.addEventListener('close', () => {
+    if(dlgCal.returnValue === 'ok'){
+      st.scale = parseFloat($('#scaleRange').value);
+      localStorage.setItem('mm_scale', String(st.scale));
+      updateScaleChip();
+    }else if(dlgCal.returnValue === 'reset'){
+      st.scale = 1;
+      localStorage.removeItem('mm_scale');
+      updateScaleChip();
     }
-    function onEnd(){
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onEnd);
+  });
+
+  // 比例
+  const dlgRatio = $('#dlgRatio');
+  $('#btnRatio').addEventListener('click', () => {
+    $('#ratioRange').value = st.ratio.toString();
+    $('#ratioLabel').textContent = `×${st.ratio.toFixed(2)}`;
+    dlgRatio.showModal();
+  });
+  $('#ratioRange').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    $('#ratioLabel').textContent = `×${v.toFixed(2)}`;
+  });
+  dlgRatio.addEventListener('close', () => {
+    if(dlgRatio.returnValue === 'ok'){
+      st.ratio = parseFloat($('#ratioRange').value);
+      localStorage.setItem('nail_ratio', String(st.ratio));
+      updateScaleChip();
     }
-    el.addEventListener('touchstart', onStart, {passive:false});
-    el.addEventListener('pointerdown', onStart);
-  }
-  makeDrag(hLeft);
-  makeDrag(hRight);
+  });
 
-  // 初始把手间距 16mm
-  function setInitialHandles(){
-    const box = ruler.getBoundingClientRect();
-    const cvBox = cv.getBoundingClientRect();
-    const originX = cvBox.left + 10;
-    const leftPX = originX + (cv.width - 20)/2 - pxFromMM(8);
-    const rightPX = originX + (cv.width - 20)/2 + pxFromMM(8);
-    hLeft.style.left = (leftPX - box.left - 10) + 'px';
-    hRight.style.left = (rightPX - box.left - 10) + 'px';
-    updateFromHandles();
-  }
-
-  // 事件绑定（移动端）
-  if(!gate.classList.contains('show')){
-    window.addEventListener('pointerdown', onPointerDown, {passive:true});
-    window.addEventListener('pointermove', onPointerMove, {passive:true});
-    window.addEventListener('pointerup', onPointerUp, {passive:true});
-
-    window.addEventListener('touchstart', (e)=>{
-      // 触碰用于放置尺子；随后可松开手指拖把手
-      const t = e.touches[0];
-      placeRuler(t.clientX, t.clientY);
-      setInitialHandles();
-    }, {passive:true});
-  }
-
-  // 对话框：规则
+  // 尺码规则
   const dlgRules = $('#dlgRules');
   $('#btnRules').addEventListener('click', () => {
     $('#ruleS').value = st.sTarget;
@@ -487,45 +456,10 @@
   });
   dlgRules.addEventListener('close', () => {
     if(dlgRules.returnValue === 'ok'){
-      const s = parseFloat($('#ruleS').value || '15');
-      const m = parseFloat($('#ruleM').value || '16');
-      st.sTarget = s; st.mTarget = m;
-      localStorage.setItem('rule_s', s.toString());
-      localStorage.setItem('rule_m', m.toString());
-      updateFromHandles();
-    }
-  });
-
-  // 校准
-  const dlgCal = $('#dlgCal');
-  $('#btnCalibrate').addEventListener('click', () => {
-    $('#scaleRange').value = st.scale.toString();
-    $('#scaleLabel').textContent = `×${(+st.scale).toFixed(2)}`;
-    const cssPx = 85.6 * (pxPerMMBase * st.scale);
-    const cardBox = $('#cardBox');
-    cardBox.style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
-    dlgCal.showModal();
-  });
-  $('#scaleRange').addEventListener('input', (e) => {
-    const v = parseFloat(e.target.value);
-    $('#scaleLabel').textContent = `×${v.toFixed(2)}`;
-    const cardBox = $('#cardBox');
-    const tmpPxPerMM = pxPerMMBase * v;
-    const cssPx = 85.6 * tmpPxPerMM;
-    cardBox.style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
-  });
-  dlgCal.addEventListener('close', () => {
-    if(dlgCal.returnValue === 'ok'){
-      const v = parseFloat($('#scaleRange').value);
-      st.scale = v;
-      localStorage.setItem('mm_scale', v.toString());
-      setScaleLabel();
-      updateFromHandles();
-    }else if(dlgCal.returnValue === 'reset'){
-      st.scale = 1;
-      localStorage.removeItem('mm_scale');
-      setScaleLabel();
-      updateFromHandles();
+      st.sTarget = parseFloat($('#ruleS').value || '15');
+      st.mTarget = parseFloat($('#ruleM').value || '16');
+      localStorage.setItem('rule_s', String(st.sTarget));
+      localStorage.setItem('rule_m', String(st.mTarget));
     }
   });
 
@@ -535,12 +469,11 @@
     setTimeout(() => {
       pxPerInch = cssPxPerInch();
       pxPerMMBase = pxPerInch / 25.4;
-      updateFromHandles();
     }, 250);
   }, { passive:true });
 
   // 初始画面
-  drawRuler(0);
+  drawRuler(15.8);
 })();
 </script>
 </body>
