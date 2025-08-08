@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no, email=no, address=no">
-  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度）</title>
+  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度·修复版）</title>
   <style>
     :root{
       --bg:#0b0d10;
@@ -120,7 +120,7 @@
     <h1>将指尖轻压在屏幕上</h1>
     <p>读取接触宽度，按照 <b>指甲 = 手指 × 比例</b> 估算（比例默认 0.68，可调）。</p>
     <p>尺子采用<b>中心零刻度</b>与 <b>L | M | S | M | L</b> 视觉布局：S 区域居中，零点在 S 正上方，两侧以 5、10、15… 递增。</p>
-    <p class="note">你反馈银行卡对齐需将<b>校准</b>设为 <b>0.83</b> 才准确——我已将默认校准改为 0.83；不同设备仍可手动微调。</p>
+    <p class="note">默认<b>校准</b>为 <b>0.83</b>（你反馈的更准值），不同设备仍可手动微调。</p>
   </div>
 
   <div id="ruler" class="hidden"><canvas id="cv" width="286" height="78"></canvas></div>
@@ -191,7 +191,6 @@
   const ruler = $('#ruler');
   const scaleInfo = $('#scaleInfo');
 
-  // 仅移动端
   const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   if(!isMobileUA || !hasTouch){ $('#gate').classList.add('show'); }
@@ -207,7 +206,6 @@
   function updateChip(){ scaleInfo.textContent = `校准×${st.scale.toFixed(2)}｜比例×${st.ratio.toFixed(2)}`; }
   updateChip();
 
-  // 换算
   function cssPxPerInch(){
     const tmp = document.createElement('div');
     tmp.style.width = '1in';
@@ -223,7 +221,6 @@
   function mmFromPx(px){ return px / pxPerMM(); }
   function pxFromMM(mm){ return mm * pxPerMM(); }
 
-  // 画尺子：中心零刻度 + L|M|S|M|L 带
   function drawRuler(nailMM){
     const w = cv.width, h = cv.height;
     ctx.clearRect(0,0,w,h);
@@ -236,24 +233,21 @@
 
     const sM = (st.sTarget + st.mTarget) / 2; // 15.5
     const mL = (st.mTarget + st.lTarget) / 2; // 16.5
-    const centerMM = (sM + mL) / 2;           // S 中心 ~ 16.0
+    const centerMM = (sM + mL) / 2;           // 16.0
     const centerX = originX + centerMM * ppm;
 
-    // 背景带
     const bandTop = 26, bandH = 24;
     function xOf(mm){ return originX + Math.max(0, Math.min(usableW, mm * ppm)); }
-    ctx.fillStyle = '#23161d'; ctx.fillRect(originX, bandTop, xOf(sM)-originX, bandH); // 左(趋向L)
-    ctx.fillStyle = '#13261c'; ctx.fillRect(xOf(sM), bandTop, xOf(mL)-xOf(sM), bandH); // 中 S
-    ctx.fillStyle = '#23161d'; ctx.fillRect(xOf(mL), bandTop, originX+usableW-xOf(mL), bandH); // 右(趋向L)
+    ctx.fillStyle = '#23161d'; ctx.fillRect(originX, bandTop, xOf(sM)-originX, bandH);
+    ctx.fillStyle = '#13261c'; ctx.fillRect(xOf(sM), bandTop, xOf(mL)-xOf(sM), bandH);
+    ctx.fillStyle = '#23161d'; ctx.fillRect(xOf(mL), bandTop, originX+usableW-xOf(mL), bandH);
 
-    // 分隔线
     ctx.strokeStyle = '#3a475b'; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(xOf(sM)+0.5, bandTop-10); ctx.lineTo(xOf(sM)+0.5, bandTop+bandH+10);
     ctx.moveTo(xOf(mL)+0.5, bandTop-10); ctx.lineTo(xOf(mL)+0.5, bandTop+bandH+10);
     ctx.stroke();
 
-    // L|M|S|M|L 标签（均分视觉区域）
     ctx.font = 'bold 12px -apple-system, system-ui, Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const leftEdge = originX, rightEdge = originX + usableW;
@@ -271,19 +265,18 @@
     ctx.fillStyle = '#e8d089'; ctx.fillText('M', centers[3], bandTop+bandH/2);
     ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', centers[4], bandTop+bandH/2);
 
-    // 顶部：中心零刻度 + 对称 5mm 递增
+    // center-zero ticks
     ctx.strokeStyle = '#2d3b51'; ctx.lineWidth = 1;
-    const stepPx = pxFromMM(5); // 每 5mm 一格
+    const stepPx = pxFromMM(5); 
     const maxSteps = Math.ceil((Math.max(centerX-originX, rightEdge-centerX)) / stepPx) + 1;
     ctx.beginPath();
     for(let i=-maxSteps; i<=maxSteps; i++){
       const x = centerX + i*stepPx + 0.5;
       if(x < originX || x > originX+usableW) continue;
-      const len = (i%2===0) ? 10 : 6; // 每 10mm 更长
+      const len = (i%2===0) ? 10 : 6;
       ctx.moveTo(x, bandTop-2); ctx.lineTo(x, bandTop-2-len);
     }
     ctx.stroke();
-    // 数字：中心写 0，两侧 5、10、15……
     ctx.fillStyle = '#c9d3e1';
     ctx.font = '10px -apple-system, system-ui, Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
@@ -295,7 +288,7 @@
       if(xL>=originX && xL<=originX+usableW) ctx.fillText(String(mm), xL, bandTop-4);
     }
 
-    // 当前值指示
+    // current value indicator
     const px = Math.max(0, Math.min(usableW, pxFromMM(nailMM)));
     ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2;
     ctx.beginPath();
@@ -327,7 +320,6 @@
     ruler.classList.remove('hidden');
   }
 
-  // 读取触点并估算
   let measuring = false;
   function updateFromContact(x, y, contactWidthPx){
     placeRuler(x, y);
@@ -355,12 +347,14 @@
   window.addEventListener('touchstart', onTouch, {passive:true});
   window.addEventListener('touchmove', onTouch, {passive:true});
 
-  // 对话框：校准
+  // 校准
   const dlgCal = $('#dlgCal');
   $('#btnCalibrate').addEventListener('click', () => {
-    $('#scaleRange')..value = st.scale.toString();
+    // FIXED: no double dot
+    $('#scaleRange').value = st.scale.toString();
     $('#scaleLabel').textContent = `×${st.scale.toFixed(2)}`;
-    const cssPx = 85.6 * ((function(){const tmp = cssPxPerInch(); return (tmp/25.4);}()) * st.scale);
+    const tmpPxPerMM = (cssPxPerInch()/25.4) * st.scale;
+    const cssPx = 85.6 * tmpPxPerMM;
     $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
     dlgCal.showModal();
   });
@@ -383,7 +377,7 @@
     }
   });
 
-  // 指甲比例
+  // 比例
   const dlgRatio = $('#dlgRatio');
   $('#btnRatio').addEventListener('click', () => {
     $('#ratioRange').value = st.ratio.toString();
@@ -418,7 +412,6 @@
     }
   });
 
-  // 方向变化
   document.addEventListener('gesturestart', e => e.preventDefault());
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
