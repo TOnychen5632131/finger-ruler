@@ -1,4 +1,5 @@
-<!doctype html>
+# Generate a second fix: ensure measuring is toggled on touchstart/touchend so iOS Safari works even if PointerEvents don't fire.
+html = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no, email=no, address=no">
-  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度·实时修复）</title>
+  <title>指甲宽度估算 · mm（手机端·Safari优化·中心零刻度·实时修复2）</title>
   <style>
     :root{
       --bg:#0b0d10;
@@ -62,10 +63,10 @@
     button.ghost{ background:#0e1217 }
     #hint{
       position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-      text-align:center; color:var(--muted);
+      text-align:center; color:#93a0b3;
       max-width:92vw; line-height:1.6; z-index:0; padding:0 8px;
     }
-    #hint h1{font-size:22px; margin:0 0 8px 0; color:var(--ink)}
+    #hint h1{font-size:22px; margin:0 0 8px 0; color:#eaeef5}
     #hint p{margin:0; font-size:14px}
     #badge{
       position:fixed; left:50%; bottom:calc(16px + var(--safe-bottom)); transform:translateX(-50%) translateY(120%);
@@ -92,8 +93,8 @@
     dialog::backdrop{ background:rgba(3,5,8,.55); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px) }
     .dlg-head{ padding:14px 16px; font-weight:700; border-bottom:1px solid #1e2633 }
     .dlg-body{ padding:16px; display:grid; gap:14px }
-    .row{ display:grid; gap:8px; font-size:13px; color:var(--muted) }
-    .row strong{ color:var(--ink) }
+    .row{ display:grid; gap:8px; font-size:13px; color:#93a0b3 }
+    .row strong{ color:#eaeef5 }
     .ctrl{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
     input[type="range"]{ width:100% }
     .preview-card{
@@ -253,7 +254,7 @@
     ctx.moveTo(xOf(mL)+0.5, bandTop-12); ctx.lineTo(xOf(mL)+0.5, bandTop+bandH+12);
     ctx.stroke();
 
-    // 标签位置与实际边界对齐：S 放在 sM~mL 中心；左右 M/L 按区间中点放置
+    // 标签：S 放在 sM~mL 中心；左右 M/L 贴近两端
     ctx.font = 'bold 12px -apple-system, system-ui, Segoe UI';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#8fe3be'; ctx.fillText('S', (xOf(sM)+xOf(mL))/2, bandTop+bandH/2);
@@ -262,7 +263,7 @@
     ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', originX+12, bandTop+bandH/2);
     ctx.fillStyle = '#ffb2c1'; ctx.fillText('L', originX+usableW-12, bandTop+bandH/2);
 
-    // 顶部：中心零刻度 + 对称 5mm 递增（数字与刻度）
+    // 顶部：中心零刻度 + 对称 5mm 递增
     const leftEdge = originX, rightEdge = originX + usableW;
     ctx.strokeStyle = '#2d3b51'; ctx.lineWidth = 1;
     const stepPx = pxFromMM(5);
@@ -286,7 +287,7 @@
       if(xL>=leftEdge && xL<=rightEdge) ctx.fillText(String(mm), xL, bandTop-6);
     }
 
-    // 当前值指示（从 0mm 开始到 nailMM 的绝对长度）
+    // 当前值指示
     const px = Math.max(0, Math.min(usableW, pxFromMM(nailMM)));
     ctx.strokeStyle = '#4aa3ff'; ctx.lineWidth = 2;
     ctx.beginPath();
@@ -330,15 +331,16 @@
       const fingerMM = mmFromPx(lastW);
       const nailMM = fingerMM * st.ratio;
       drawRuler(nailMM);
-      badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${sizeFromNailWidth(nailMM)}`;
+      const size = sizeFromNailWidth(nailMM);
+      badge.textContent = `估算指甲 ${nailMM.toFixed(1)} mm • 尺码 ${size}`;
       badge.classList.add('show');
-      hasSample=false; // 等待下一帧新样本
+      hasSample=false;
     }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 
-  // Pointer / Touch 事件：不断喂样本，动画循环实时渲染
+  // Pointer 事件
   function onPointerDown(e){
     if(e.pointerType !== 'touch') return;
     measuring = true;
@@ -349,25 +351,40 @@
     if(e.width && e.width>0) feedSample(e.clientX, e.clientY, e.width);
   }
   function onPointerUp(e){ if(e.pointerType==='touch') measuring=false; }
+  function onPointerCancel(e){ if(e.pointerType==='touch') measuring=false; }
   window.addEventListener('pointerdown', onPointerDown, {passive:true});
   window.addEventListener('pointermove', onPointerMove, {passive:true});
   window.addEventListener('pointerup', onPointerUp, {passive:true});
+  window.addEventListener('pointercancel', onPointerCancel, {passive:true});
 
-  function onTouch(e){
+  // Touch 兜底（关键修复：在 touchstart/ end 上切换 measuring）
+  function onTouchStart(e){
+    measuring = true;
     if(e.touches.length===0) return;
     const t = e.touches[0];
     const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
     if(widthPx>0) feedSample(t.clientX, t.clientY, widthPx);
   }
-  window.addEventListener('touchstart', onTouch, {passive:true});
-  window.addEventListener('touchmove', onTouch, {passive:true});
+  function onTouchMove(e){
+    if(!measuring) return;
+    if(e.touches.length===0) return;
+    const t = e.touches[0];
+    const widthPx = t.radiusX ? (t.radiusX * 2) : 0;
+    if(widthPx>0) feedSample(t.clientX, t.clientY, widthPx);
+  }
+  function onTouchEnd(){ measuring = false; hasSample=false; }
+  window.addEventListener('touchstart', onTouchStart, {passive:true});
+  window.addEventListener('touchmove', onTouchMove, {passive:true});
+  window.addEventListener('touchend', onTouchEnd, {passive:true});
+  window.addEventListener('touchcancel', onTouchEnd, {passive:true});
 
   // 校准
   const dlgCal = $('#dlgCal');
   $('#btnCalibrate').addEventListener('click', () => {
-    $('#scaleRange').value = st.scale.toString();
+    const scaleRange = $('#scaleRange');
+    scaleRange.value = st.scale.toString();
     $('#scaleLabel').textContent = `×${st.scale.toFixed(2)}`;
-    const tmpPxPerMM = (cssPxPerInch()/25.4) * st.scale;
+    const tmpPxPerMM = (cssPxPerInch()/25.4) * parseFloat(scaleRange.value);
     const cssPx = 85.6 * tmpPxPerMM;
     $('#cardBox').style.width = `${Math.max(120, Math.min(window.innerWidth - 64, cssPx))}px`;
     dlgCal.showModal();
@@ -398,7 +415,7 @@
     $('#ratioLabel').textContent = `×${st.ratio.toFixed(2)}`;
     dlgRatio.showModal();
   });
-  $('#ratioRange'].addEventListener('input', (e) => {
+  $('#ratioRange').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
     $('#ratioLabel').textContent = `×${v.toFixed(2)}`;
   });
@@ -439,3 +456,9 @@
 </script>
 </body>
 </html>
+"""
+path = "/mnt/data/finger-ruler-nailratio-centered-scale083-rtfix2.html"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(html)
+
+path
