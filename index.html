@@ -65,7 +65,7 @@
       padding: 10px 14px; border-radius: 999px; font-weight:700; font-size:14px; z-index:40;
       display:flex; align-items:center; gap:10px; box-shadow: var(--shadow);
     }
-    #lockBtn{ pointer-events:auto; }
+    
 
     /* 手动双把手模式 */
     #manualWrap{ position:absolute; pointer-events:auto; padding:10px 12px; width:320px; }
@@ -127,7 +127,6 @@
 
   <div id="resultPill">
     <span id="pillText">—.— mm • 尺码 —</span>
-    <button class="btn" id="lockBtn" style="padding:6px 10px">锁定</button>
   </div>
 
   <!-- 模态框：校准 -->
@@ -247,7 +246,6 @@
     const ctx = canvas.getContext('2d', { desynchronized: true });
     const overlay = $('#overlay');
     const pill = $('#pillText');
-    const lockBtn = $('#lockBtn');
     const hint = $('#hint');
     const chipScale = $('#chipScale');
     const chipRatio = $('#chipRatio');
@@ -287,9 +285,7 @@
     // ================================
     let measuring = false;
     let manualMode = false; // 双把手模式
-    let locked = false;
     let lastSample = { x: 0, y: 0, w: 0 };
-    let hasSample = false;
     let zeroFrameCount = 0; // 连续 0 宽计数，用于自动切换手动模式
 
     // 中值滤波队列（3 帧）
@@ -326,8 +322,7 @@
     function feedSample(x, y, w){
       lastSample = { x, y, w };
       placeAbove(x, y);
-      hasSample = true;
-    }
+      }
 
     function placeAbove(x, y){
       const pad = 16;
@@ -350,7 +345,7 @@
       e.preventDefault();
     }, { passive: false });
     document.addEventListener('pointermove', (e) => {
-      if(measuring && pointerActive && !locked && !manualMode){
+      if(measuring && pointerActive && !manualMode){
         const w = e.width || 0; feedSample(e.clientX, e.clientY, w);
         e.preventDefault();
       }
@@ -361,7 +356,7 @@
 
     // 触摸事件兜底（iOS Safari 常用）
     document.addEventListener('touchstart', (e) => {
-      if(locked || manualMode) return;
+      if(manualMode) return;
       const t = e.touches[0] || e.changedTouches[0];
       if(!t) return;
       measuring = true; zeroFrameCount = 0; hint.style.display = 'none';
@@ -370,7 +365,7 @@
       e.preventDefault();
     }, { passive:false });
     document.addEventListener('touchmove', (e) => {
-      if(!measuring || locked || manualMode) return;
+      if(!measuring || manualMode) return;
       const t = e.touches[0] || e.changedTouches[0];
       if(!t) return;
       const w = (t.radiusX ? t.radiusX * 2 : 0);
@@ -381,11 +376,6 @@
     document.addEventListener('touchcancel', () => { measuring = false; }, { passive:true });
 
     // 模式切换与锁定
-    lockBtn.addEventListener('click', () => {
-      locked = !locked; lockBtn.textContent = locked ? '解锁' : '锁定';
-    })
-    btnMode.addEventListener('click', () => {
-      manualMode = !manualMode; updateModeUI();
     })
     function updateModeUI(){
       modeText.textContent = manualMode ? '手动' : '触点';
@@ -496,10 +486,10 @@
     // 主循环
     // ================================
     function tick(){
-      if(locked){ requestAnimationFrame(tick); return; }
+      
       const mmPX = pxPerMM();
 
-      if(measuring && hasSample && !manualMode){
+      if(measuring && !manualMode){
         let { w } = lastSample;
         if(!w || w<=0){ zeroFrameCount++; } else { zeroFrameCount = 0; }
         if(zeroFrameCount >= 10){ // 连续多帧为 0，切到手动模式
@@ -512,8 +502,7 @@
         const smoothed = median(mmQueue);
         updatePill(smoothed);
         drawRuler(smoothed);
-        hasSample = false;
-      }
+        }
 
       if(manualMode){
         // 从把手读像素差
